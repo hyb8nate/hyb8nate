@@ -3,12 +3,13 @@
 import uuid
 from enum import Enum
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Labels(BaseModel):
     """Labels Model."""
+
     NAMESPACE_LABEL_KEY: str = "hyb8nate.xyz/enabled"
     NAMESPACE_LABEL_VALUE: str = "true"
 
@@ -34,6 +35,7 @@ class LogLevel(str, Enum):
 
 class Settings(Labels, BaseSettings):
     """API settings."""
+
     # ENV
     PORT: int = 8000
     ENVIRONMENT: Environment = Environment.PRODUCTION

@@ -156,7 +156,7 @@ async def create_schedule(
 
             await db.commit()
             await db.refresh(schedule)
-        except Exception as e:
+        except Exception:
             # Log the error but don't fail the schedule creation
             # The scheduler will try again at the next minute
             pass

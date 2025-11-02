@@ -164,9 +164,10 @@ class SchedulerService:
             - scale_down=19:00, scale_up=08:00, current=10:00 -> False
             - scale_down=13:00, scale_up=14:00, current=13:30 -> True (same day period)
         """
+
         # Parse time strings to comparable integers (HHMM format)
         def time_to_int(time_str: str) -> int:
-            hours, minutes = map(int, time_str.split(':'))
+            hours, minutes = map(int, time_str.split(":"))
             return hours * 100 + minutes
 
         down = time_to_int(scale_down_time)
