@@ -1,6 +1,6 @@
 [project]
 name = "hyb8nate"
-version = "0.1.0-alpha"
+version = "0.1.0-beta"
 description = "Automatically scale Kubernetes deployments up/down based on time schedules"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -111,7 +111,7 @@ spec:
       serviceAccountName: hyb8nate-service-account
       containers:
         - name: hyb8nate
-          image: hyb8nate/hyb8nate:0.1.0-alpha
+          image: hyb8nate/hyb8nate:0.1.0-beta
           imagePullPolicy: Always
           ports:
             - name: http
