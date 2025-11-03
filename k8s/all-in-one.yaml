@@ -1,0 +1,173 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyb8nate
+  labels:
+    app: hyb8nate
+    name: hyb8nate
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hyb8nate-service-account
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hyb8nate-cluster-role
+  labels:
+    app: hyb8nate
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hyb8nate-cluster-role-binding
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hyb8nate-cluser-role
+subjects:
+  - kind: ServiceAccount
+    name: hyb8nate-service-account
+    namespace: hyb8nate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyb8nate-data
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mo
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hyb8nate
+  template:
+    metadata:
+      labels:
+        app: hyb8nate
+    spec:
+      serviceAccountName: hyb8nate-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: hyb8nate
+          image: hyb8nate/hyb8nate:v0.1.0-dev
+          imagePullPolicy: always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: hyb8nate-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hyb8nate-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  selector:
+      app: hyb8nate
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  rules:
+    - host: hyb8nate.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hyb8nate
+                port:
+                  number: 80
