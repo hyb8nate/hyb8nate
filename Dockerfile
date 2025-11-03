@@ -14,8 +14,8 @@ RUN npm run build
 FROM ghcr.io/astral-sh/uv:python3.13-alpine
 
 WORKDIR /app
-COPY backend/pyproject.toml backend/uv.lock* ./
-RUN uv sync --frozen
+COPY backend/pyproject.toml ./
+RUN uv sync --no-dev
 
 # Copy backend source code (new structure: src/ instead of app/)
 COPY backend/src ./src
