@@ -1,8 +1,19 @@
-# hyb8nate
+
+
+<div>
+    <div style="float: left">
+        <img src="frontend/public/logos/logo-64.png" />
+    </div>
+    <div>
+        <h1>
+          hyb8nate
+        </h1>
+    </div>
+</div>
 
 <div align="center">
 
-![hyb8nate Logo](frontend/public/logo.svg)
+![hyb8nate dashboard](doc/screen_dashboard.png)
 
 **Intelligent Kubernetes deployment hibernation scheduler**
 
@@ -19,6 +30,7 @@ All-in-one service to automatically hibernate (scale to 0) your Kubernetes deplo
 </div>
 
 ---
+
 
 ## 🎯 Overview
 
