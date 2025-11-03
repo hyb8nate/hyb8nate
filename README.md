@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![hyb8nate Logo](https://hyb8nate.xyz/assets/images/logo.png)
+![hyb8nate Logo](frontend/public/logo.svg)
 
 **Intelligent Kubernetes deployment hibernation scheduler**
 
@@ -164,31 +164,6 @@ This creates:
 - ClusterIP Service
 - (Optional) Ingress
 
-### Option 2: Step-by-Step Installation
-
-```bash
-# 1. Create namespace
-kubectl create namespace hyb8nate
-
-# 2. Create ServiceAccount and RBAC
-kubectl apply -f k8s/rbac.yaml
-
-# 3. Create PersistentVolumeClaim for database
-kubectl apply -f k8s/pvc.yaml
-
-# 4. (Optional) Create Secret for admin password
-kubectl create secret generic hyb8nate-secret \
-  -n hyb8nate \
-  --from-literal=admin-password=your-secure-password
-
-# 5. Deploy the application
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-
-# 6. (Optional) Setup Ingress
-kubectl apply -f k8s/ingress.yaml
-```
-
 ### Option 3: Helm Chart (Coming Soon)
 
 ```bash
@@ -208,7 +183,7 @@ helm install hyb8nate hyb8nate/hyb8nate \
 | `JWT_SECRET_KEY` | Secret key for JWT tokens | Auto-generated | ❌ |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiration (minutes) | `30` | ❌ |
 | `TIMEZONE` | Timezone for schedules | `Europe/Paris` | ❌ |
-| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `ERROR` | ❌ |
+| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` | ❌ |
 | `DEBUG` | Enable debug mode | `false` | ❌ |
 
 ### Example Configuration
@@ -238,9 +213,9 @@ data:
 ### Kubernetes Resources
 
 **Minimum requirements**:
-- **CPU**: 100m (requests), 500m (limits)
-- **Memory**: 128Mi (requests), 512Mi (limits)
-- **Storage**: 1Gi PersistentVolume for SQLite database
+- **CPU**: 100m (requests), 300m (limits)
+- **Memory**: 128Mi (requests), 256Mi (limits)
+- **Storage**: 100M PersistentVolume for SQLite database
 
 **RBAC Permissions** (read-only except for deployments):
 ```yaml
@@ -372,22 +347,6 @@ npm run dev
 **Build Docker image**:
 ```bash
 docker build -t hyb8nate:dev .
-```
-
-### Testing
-
-```bash
-# Backend tests
-cd backend
-uv run pytest
-
-# Frontend tests
-cd frontend
-npm test
-
-# Lint
-cd backend && ruff check .
-cd frontend && npm run lint
 ```
 
 ## 🛠️ Troubleshooting
