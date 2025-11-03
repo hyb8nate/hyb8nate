@@ -1,0 +1,197 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyb8nate
+  labels:
+    app: hyb8nate
+    name: hyb8nate
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hyb8nate-service-account
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hyb8nate-cluster-role
+  labels:
+    app: hyb8nate
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hyb8nate-cluster-role-binding
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hyb8nate-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: hyb8nate-service-account
+    namespace: hyb8nate
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hyb8nate-pv
+  labels:
+    app: hyb8nate
+spec:
+  capacity:
+    storage: 100M
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /mnt/data/hyb8nate
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hyb8nate-data
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 100M
+  selector:
+    matchLabels:
+      app: hyb8nate
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hyb8nate
+  template:
+    metadata:
+      labels:
+        app: hyb8nate
+    spec:
+      serviceAccountName: hyb8nate-service-account
+      containers:
+        - name: hyb8nate
+          image: hyb8nate/hyb8nate:0.1.0-beta
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: HOME
+              value: /data
+            - name: UV_NO_CACHE
+              value: "1"
+            - name: DATA_DIR
+              value: /data
+            - name: ADMIN_PASSWORD
+              value: admin
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hyb8nate-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  selector:
+      app: hyb8nate
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hyb8nate
+  namespace: hyb8nate
+  labels:
+    app: hyb8nate
+spec:
+  rules:
+    - host: hyb8nate.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hyb8nate
+                port:
+                  number: 80
