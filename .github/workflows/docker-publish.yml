@@ -44,7 +44,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
-            type=ref,event=branch,suffix=-sha-{{sha}},enable=${{ startsWith(github.ref, 'refs/heads/dev-') }}
+            type=ref,event=branch,suffix=-sha-{{sha}},enable=${{ startsWith(github.ref_name, 'dev-') }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
