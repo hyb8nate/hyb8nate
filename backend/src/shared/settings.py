@@ -39,9 +39,10 @@ class Settings(Labels, BaseSettings):
     # ENV
     PORT: int = 8000
     ENVIRONMENT: Environment = Environment.PRODUCTION
-    LOG_LEVEL: LogLevel = LogLevel.ERROR
+    LOG_LEVEL: LogLevel = LogLevel.INFO
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Paris"
+    DATA_DIR: str = "/data"
 
     # AUTH
     ADMIN_PASSWORD: str = "admin"  # Change via ADMIN_PASSWORD env var

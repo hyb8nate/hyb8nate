@@ -52,7 +52,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   const loadNamespaces = async () => {
     try {
       const data = await k8sAPI.getNamespaces();
-      // Backend now only returns allowed namespaces (with hyp8nate label)
+      // Backend now only returns allowed namespaces (with hyb8nate label)
       setNamespaces(data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load namespaces');

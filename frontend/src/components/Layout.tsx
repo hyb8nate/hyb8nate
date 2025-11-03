@@ -35,7 +35,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                    hyp8nate
+                    hyb8nate
                   </h1>
                   <p className="text-xs text-gray-500">K8s Hibernation</p>
                 </div>

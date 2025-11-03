@@ -1,6 +1,6 @@
 # Logo Placeholders
 
-Ce dossier contient des logos placeholder pour hyp8nate.
+Ce dossier contient des logos placeholder pour hyb8nate.
 
 ## Fichiers disponibles
 

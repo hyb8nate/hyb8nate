@@ -45,11 +45,29 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: hyb8nate-cluser-role
+  name: hyb8nate-cluster-role
 subjects:
   - kind: ServiceAccount
     name: hyb8nate-service-account
     namespace: hyb8nate
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hyb8nate-pv
+  labels:
+    app: hyb8nate
+spec:
+  capacity:
+    storage: 100M
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  hostPath:
+    path: /mnt/data/hyb8nate
+    type: DirectoryOrCreate
 
 ---
 apiVersion: v1
@@ -62,9 +80,13 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: ""
   resources:
     requests:
-      storage: 100Mo
+      storage: 100M
+  selector:
+    matchLabels:
+      app: hyb8nate
 
 ---
 apiVersion: apps/v1
@@ -87,21 +109,23 @@ spec:
         app: hyb8nate
     spec:
       serviceAccountName: hyb8nate-service-account
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
       containers:
         - name: hyb8nate
-          image: hyb8nate/hyb8nate:v0.1.0-dev
-          imagePullPolicy: always
+          image: hyb8nate/hyb8nate:0.1.0-alpha
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8000
               protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: hyb8nate-config
+          env:
+            - name: HOME
+              value: /data
+            - name: UV_NO_CACHE
+              value: "1"
+            - name: DATA_DIR
+              value: /data
+            - name: ADMIN_PASSWORD
+              value: admin
           volumeMounts:
             - name: data
               mountPath: /data
@@ -123,11 +147,11 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              memory: "256Mi"
+              memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "300m"
       volumes:
         - name: data
           persistentVolumeClaim:
