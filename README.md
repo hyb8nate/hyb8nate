@@ -1,5 +1,3 @@
-
-
 <div>
     <div style="float: left">
         <img src="frontend/public/logos/logo-64.png" />
@@ -77,6 +75,10 @@ Perfect for:
 - **Minimal permissions**: RBAC with least privilege principle
 - **Multi-architecture**: Supports AMD64 and ARM64
 
+### 💤 Automatic snooze labels
+
+- **FluxCD & ArgoCD**: sync snooze labels added automatically if needed
+
 ## 🏗️ Architecture
 
 ```
@@ -94,10 +96,10 @@ Perfect for:
 │  │         ├─────────► SQLite Database            │    │
 │  │         │            (PersistentVolume)        │    │
 │  │         │                                      │    │
-│  │  ┌──────▼───────┐                              │    │
-│  │  │  Scheduler   │                              │    │
+│  │  ┌──────▼────────┐                             │    │
+│  │  │  Scheduler    │                             │    │
 │  │  │  (APScheduler)│                             │    │
-│  │  └──────┬───────┘                              │    │
+│  │  └──────┬────────┘                             │    │
 │  └─────────┼──────────────────────────────────────┘    │
 │            │                                           │
 │            ▼                                           │
@@ -196,7 +198,8 @@ helm install hyb8nate hyb8nate/hyb8nate \
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiration (minutes) | `30` | ❌ |
 | `TIMEZONE` | Timezone for schedules | `Europe/Paris` | ❌ |
 | `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` | ❌ |
-| `DEBUG` | Enable debug mode | `false` | ❌ |
+| `FLUXCD_OPTION` | Snooze label to avoid FluxCD sync | `false` | ❌ |
+| `ARGOCD_OPTION` | Snooze label to avoid ArgoCD sync | `false` | ❌ |
 
 ### Example Configuration
 
@@ -225,11 +228,13 @@ data:
 ### Kubernetes Resources
 
 **Minimum requirements**:
+
 - **CPU**: 100m (requests), 300m (limits)
 - **Memory**: 128Mi (requests), 256Mi (limits)
 - **Storage**: 100M PersistentVolume for SQLite database
 
 **RBAC Permissions** (read-only except for deployments):
+
 ```yaml
 rules:
   - apiGroups: [""]
@@ -255,6 +260,7 @@ You can also customize the label key/value via environment variables.
 ### 2. Create a Schedule
 
 **Via the UI**:
+
 1. Open hyb8nate in your browser
 2. Click **"New Schedule"** button
 3. Select namespace from dropdown (only labeled namespaces appear)
@@ -264,6 +270,7 @@ You can also customize the label key/value via environment variables.
 7. Click **"Create Schedule"**
 
 **Via API**:
+
 ```bash
 # 1. Login to get token
 curl -X POST http://localhost:8000/api/auth/login \
@@ -285,11 +292,13 @@ curl -X POST http://localhost:8000/api/schedules \
 ### 3. Monitor Schedules
 
 **Dashboard View**:
+
 - Green badge: Schedule is enabled
 - Red badge: Schedule is disabled
 - "Currently scaled down" indicator: Deployment is hibernated
 
 **Via API**:
+
 ```bash
 curl http://localhost:8000/api/schedules \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -301,6 +310,7 @@ curl http://localhost:8000/api/schedules \
 - **Via API**: Send a PATCH request to `/api/schedules/{id}`
 
 **Smart behavior**:
+
 - If you **disable** a schedule that's currently hibernated, it scales back up immediately
 - If you **enable** a schedule during hibernation period, it scales down immediately
 
@@ -334,12 +344,14 @@ When you delete a schedule, hyb8nate automatically scales the deployment back to
 ### Local Development
 
 **Prerequisites**:
+
 - Python 3.13+
 - Node.js 22+
 - uv (Python package manager)
 - Access to a Kubernetes cluster (for testing)
 
 **Backend**:
+
 ```bash
 cd backend
 uv sync
@@ -349,6 +361,7 @@ uv run python main.py
 ```
 
 **Frontend**:
+
 ```bash
 cd frontend
 npm install
@@ -357,6 +370,7 @@ npm run dev
 ```
 
 **Build Docker image**:
+
 ```bash
 docker build -t hyb8nate:dev .
 ```
@@ -366,17 +380,20 @@ docker build -t hyb8nate:dev .
 ### Schedule not triggering
 
 **Check scheduler is running**:
+
 ```bash
 kubectl logs -n hyb8nate -l app=hyb8nate -f | grep "Scheduler started"
 ```
 
 **Check schedule exists and is enabled**:
+
 ```bash
 curl http://localhost:8000/api/schedules \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 **Check timezone configuration**:
+
 ```bash
 kubectl get deployment -n hyb8nate hyb8nate -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="TIMEZONE")].value}'
 ```
@@ -384,6 +401,7 @@ kubectl get deployment -n hyb8nate hyb8nate -o jsonpath='{.spec.template.spec.co
 ### Permission denied errors
 
 **Check RBAC permissions**:
+
 ```bash
 kubectl auth can-i get deployments --as=system:serviceaccount:hyb8nate:hyb8nate -n my-namespace
 kubectl auth can-i patch deployments --as=system:serviceaccount:hyb8nate:hyb8nate -n my-namespace
@@ -392,12 +410,14 @@ kubectl auth can-i patch deployments --as=system:serviceaccount:hyb8nate:hyb8nat
 ### Namespace not appearing in dropdown
 
 **Check namespace has required label**:
+
 ```bash
 kubectl get namespace my-namespace -o jsonpath='{.metadata.labels.hyb8nate\.xyz/enabled}'
 # Should output: true
 ```
 
 **Add label if missing**:
+
 ```bash
 kubectl label namespace my-namespace hyb8nate.xyz/enabled=true
 ```
@@ -405,6 +425,7 @@ kubectl label namespace my-namespace hyb8nate.xyz/enabled=true
 ### Database corrupted
 
 **Reset database** (⚠️ this deletes all schedules):
+
 ```bash
 kubectl delete pvc -n hyb8nate hyb8nate-data
 kubectl delete pod -n hyb8nate -l app=hyb8nate

@@ -43,6 +43,8 @@ class Settings(Labels, BaseSettings):
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Paris"
     DATA_DIR: str = "/data"
+    FLUXCD_OPTION: bool = False
+    ARGOCD_OPTION: bool = False
 
     # AUTH
     ADMIN_PASSWORD: str = "admin"  # Change via ADMIN_PASSWORD env var
