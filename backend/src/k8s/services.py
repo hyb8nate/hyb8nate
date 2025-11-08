@@ -3,8 +3,9 @@ import os
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-
+from kubernetes.client.models.v1_deployment import V1Deployment
 from src.schedules.models import DeploymentInfo
+from src.shared.settings import settings
 
 
 class K8sClient:
@@ -12,6 +13,8 @@ class K8sClient:
 
     apps_v1: client.AppsV1Api
     core_v1: client.CoreV1Api
+    FLUXCD_ANNOTATION_KEY: str = "kustomize.toolkit.fluxcd.io/reconcile"
+    ARGOCD_ANNOTATION_KEY: str = "argocd.argoproj.io/skip-reconcile"
 
     def __init__(self):
         """Initialize Kubernetes client."""
@@ -66,7 +69,7 @@ class K8sClient:
         except ApiException as e:
             raise Exception(f"Failed to list deployments: {e}")
 
-    def get_deployment(self, namespace: str, name: str):
+    def get_deployment(self, namespace: str, name: str) -> V1Deployment:
         """Get a specific deployment"""
         try:
             return self.apps_v1.read_namespaced_deployment(name, namespace)
@@ -84,19 +87,46 @@ class K8sClient:
     def scale_deployment(self, namespace: str, name: str, replicas: int) -> None:
         """Scale a deployment to specified replicas"""
         try:
-            deployment = self.get_deployment(namespace, name)
+            deployment = self.get_deployment(namespace=namespace, name=name)
+            annotations = dict(deployment.metadata.annotations) if deployment.metadata.annotations else {}
+
+            if settings.FLUXCD_OPTION:
+                if replicas == 0:
+                    self.__logger.info(f"Scaling down {namespace}/{name}, setting FluxCD annotation to disabled")
+                    annotations[self.FLUXCD_ANNOTATION_KEY] = "disabled"
+                else:
+                    if annotations.get(self.FLUXCD_ANNOTATION_KEY):
+                        self.__logger.info(f"Scaling up {namespace}/{name}, removing FluxCD annotation")
+                        annotations.pop(self.FLUXCD_ANNOTATION_KEY, None)
+
+            if settings.ARGOCD_OPTION:
+                if replicas == 0:
+                    self.__logger.info(f"Scaling down {namespace}/{name}, setting ArgoCD annotation to true")
+                    annotations[self.ARGOCD_ANNOTATION_KEY] = "true"
+                else:
+                    if annotations.get(self.ARGOCD_ANNOTATION_KEY):
+                        self.__logger.info(f"Scaling up {namespace}/{name}, removing ArgoCD annotation")
+                        annotations.pop(self.ARGOCD_ANNOTATION_KEY, None)
+
+            deployment.metadata.annotations = annotations
             deployment.spec.replicas = replicas
-            self.apps_v1.patch_namespaced_deployment(name=name, namespace=namespace, body=deployment)
+            self.apps_v1.replace_namespaced_deployment(
+                name=name,
+                namespace=namespace,
+                body=deployment
+            )
         except Exception as e:
             raise Exception(f"Failed to scale deployment {name} to {replicas} replicas: {e}")
 
     def scale_down(self, namespace: str, name: str) -> None:
         """Scale down deployment to 0 replicas"""
-        self.scale_deployment(namespace, name, 0)
+        self.__logger.info(f"Scaling down deployment {namespace}/{name} to 0 replicas")
+        self.scale_deployment(namespace=namespace, name=name, replicas=0)
 
     def scale_up(self, namespace: str, name: str, replicas: int) -> None:
         """Scale up deployment to specified replicas"""
-        self.scale_deployment(namespace, name, replicas)
+        self.__logger.info(f"Scaling up deployment {namespace}/{name} to {replicas} replicas")
+        self.scale_deployment(namespace=namespace, name=name, replicas=replicas)
 
 
 # Global instance

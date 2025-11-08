@@ -151,8 +151,8 @@ async def create_schedule(
 
             # Update schedule state
             schedule.is_scaled_down = True
-            schedule.last_scaled_at = datetime.utcnow()
-            schedule.updated_at = datetime.utcnow()
+            schedule.last_scaled_at = datetime.now(tz)
+            schedule.updated_at = datetime.now(tz)
 
             await db.commit()
             await db.refresh(schedule)
@@ -208,7 +208,7 @@ async def update_schedule(
             )
             # Update state
             schedule.is_scaled_down = False
-            schedule.last_scaled_at = datetime.utcnow()
+            schedule.last_scaled_at = datetime.now(tz)
         except Exception as e:
             # Log error but continue with update
             import logging

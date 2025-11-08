@@ -2,9 +2,14 @@
 
 from datetime import datetime
 
+import pytz
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, UniqueConstraint
 
+from src.shared.settings import settings
+
 from .database import Base
+
+tz = pytz.timezone(settings.TIMEZONE)
 
 
 class ScheduleDB(Base):
@@ -21,7 +26,7 @@ class ScheduleDB(Base):
     enabled = Column(Boolean, default=True, nullable=False)
     is_scaled_down = Column(Boolean, default=False, nullable=False)
     last_scaled_at = Column(DateTime, nullable=True)  # Last time scaled up or down
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(tz), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(tz), onupdate=datetime.now(tz), nullable=False)
 
     __table_args__ = (UniqueConstraint("namespace", "deployment_name", name="uix_namespace_deployment"),)

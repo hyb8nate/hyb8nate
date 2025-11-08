@@ -42,7 +42,9 @@ class Settings(Labels, BaseSettings):
     LOG_LEVEL: LogLevel = LogLevel.INFO
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Paris"
-    DATA_DIR: str = "/data"
+    DATA_DIR: str = ".data/"
+    FLUXCD_OPTION: bool = True
+    ARGOCD_OPTION: bool = True
 
     # AUTH
     ADMIN_PASSWORD: str = "admin"  # Change via ADMIN_PASSWORD env var

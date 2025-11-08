@@ -1,5 +1,3 @@
-
-
 <div>
     <div style="float: left">
         <img src="frontend/public/logos/logo-64.png" />
