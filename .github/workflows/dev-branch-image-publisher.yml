@@ -1,15 +1,9 @@
-name: Build and Push Docker Images
+name: Build and Push Docker Images for dev-* branches
 
 on:
   push:
     branches:
-      - main
       - dev-*
-    tags:
-      - 'v*.*.*'
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-push:
@@ -35,24 +29,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: hyb8nate/hyb8nate
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=ref,event=branch,suffix=-sha-{{sha}},enable=${{ startsWith(github.ref_name, 'dev-') }}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: hyb8nate/hyb8nate:${{ github.ref_name}}
           cache-from: type=gha
           cache-to: type=gha,mode=max
