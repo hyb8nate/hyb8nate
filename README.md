@@ -115,7 +115,7 @@ Perfect for:
 
 - **Backend**: Python 3.13 + FastAPI + APScheduler
 - **Frontend**: React + TypeScript + Tailwind CSS
-- **Database**: SQLite (embedded, no external DB needed)
+- **Database**: SQLite (default, no setup) or PostgreSQL (production-ready, scalable)
 - **Kubernetes Client**: Official Python kubernetes client
 - **Container**: All-in-one Docker image (backend serves static frontend)
 
@@ -126,6 +126,7 @@ Perfect for:
 - Kubernetes cluster (v1.21+)
 - `kubectl` configured to access your cluster
 - Cluster-admin permissions (for initial RBAC setup)
+- **Optional**: PostgreSQL 13+ database (SQLite is used by default)
 
 ### 1. Label your namespaces
 
@@ -193,6 +194,14 @@ helm install hyb8nate hyb8nate/hyb8nate \
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
+| `DB_TYPE` | Database type: `sqlite` or `postgresql` | `sqlite` | ❌ |
+| `SQLITE_PATH` | Path to SQLite database file (if DB_TYPE=sqlite) | `./data/hyb8nate.db` | ❌ |
+| `DB_HOST` | PostgreSQL host (if DB_TYPE=postgresql) | `localhost` | ⚠️ |
+| `DB_PORT` | PostgreSQL port (if DB_TYPE=postgresql) | `5432` | ⚠️ |
+| `DB_USER` | PostgreSQL username (if DB_TYPE=postgresql) | `hyb8nate` | ⚠️ |
+| `DB_PASSWORD` | PostgreSQL password (if DB_TYPE=postgresql) | - | ⚠️ |
+| `DB_DB` | PostgreSQL database name (if DB_TYPE=postgresql) | `hyb8nate` | ⚠️ |
+| `ADMIN_EMAIL` | Admin user email | `admin@hyb8nate.local` | ❌ |
 | `ADMIN_PASSWORD` | Admin login password | `admin` | ❌ |
 | `JWT_SECRET_KEY` | Secret key for JWT tokens | Auto-generated | ❌ |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiration (minutes) | `30` | ❌ |
@@ -201,7 +210,27 @@ helm install hyb8nate hyb8nate/hyb8nate \
 | `FLUXCD_OPTION` | Snooze label to avoid FluxCD sync | `false` | ❌ |
 | `ARGOCD_OPTION` | Snooze label to avoid ArgoCD sync | `false` | ❌ |
 
+⚠️ = Required only when using PostgreSQL (`DB_TYPE=postgresql`)
+
 ### Example Configuration
+
+**Using SQLite (default, no configuration needed)**:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyb8nate-config
+  namespace: hyb8nate
+data:
+  DB_TYPE: "sqlite"
+  SQLITE_PATH: "./data/hyb8nate.db"
+  TIMEZONE: "America/New_York"
+  LOG_LEVEL: "INFO"
+  ADMIN_PASSWORD: "your-secure-password"
+```
+
+**Using PostgreSQL**:
 
 ```yaml
 apiVersion: v1
@@ -211,6 +240,7 @@ metadata:
   namespace: hyb8nate
 type: Opaque
 stringData:
+  db-password: "your-db-password"
   admin-password: "your-secure-password"
 ---
 apiVersion: v1
@@ -219,10 +249,13 @@ metadata:
   name: hyb8nate-config
   namespace: hyb8nate
 data:
+  DB_TYPE: "postgresql"
+  DB_HOST: "postgres.default.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_USER: "hyb8nate"
+  DB_DB: "hyb8nate"
   TIMEZONE: "America/New_York"
   LOG_LEVEL: "INFO"
-  NAMESPACE_LABEL_KEY: "hyb8nate.xyz/enabled"
-  NAMESPACE_LABEL_VALUE: "true"
 ```
 
 ### Kubernetes Resources

@@ -7,6 +7,13 @@ import type {
   ScheduleCreate,
   ScheduleUpdate,
   ApiError,
+  User,
+  UserCreate,
+  UserUpdate,
+  UserListResponse,
+  ApiKey,
+  ApiKeyCreate,
+  ApiKeyCreated,
 } from '../types';
 
 // Create axios instance
@@ -29,15 +36,54 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors
+// Response interceptor to handle errors and auto-refresh tokens
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
+    const originalRequest = error.config;
+
+    // If error is 401 and we haven't tried to refresh yet
+    if (error.response?.status === 401 && originalRequest && !(originalRequest as any)._retry) {
+      (originalRequest as any)._retry = true;
+
+      try {
+        // Try to refresh the token
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const tokenData = await authAPI.refresh(refreshToken);
+
+          // Update tokens in localStorage
+          localStorage.setItem('access_token', tokenData.access_token);
+          localStorage.setItem('refresh_token', tokenData.refresh_token);
+
+          // Update authorization header for the original request
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${tokenData.access_token}`;
+          }
+
+          // Retry the original request with new token
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, logout user
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('user_role');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+
+    // If not 401 or refresh failed, reject the error
     if (error.response?.status === 401) {
-      // Token expired or invalid, redirect to login
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('user_role');
       window.location.href = '/login';
     }
+
     return Promise.reject(error);
   }
 );
@@ -46,6 +92,27 @@ api.interceptors.response.use(
 export const authAPI = {
   login: async (credentials: LoginRequest): Promise<Token> => {
     const response = await api.post<Token>('/auth/login', credentials);
+    return response.data;
+  },
+
+  refresh: async (refreshToken: string): Promise<Token> => {
+    const response = await api.post<Token>('/auth/refresh', {
+      refresh_token: refreshToken,
+    });
+    return response.data;
+  },
+
+  logout: async (refreshToken: string): Promise<void> => {
+    await api.post('/auth/logout', {
+      refresh_token: refreshToken,
+    });
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
     return response.data;
   },
 };
@@ -89,6 +156,57 @@ export const k8sAPI = {
       `/namespaces/${namespace}/deployments`
     );
     return response.data;
+  },
+};
+
+// Users API
+export const usersAPI = {
+  getMe: async (): Promise<User> => {
+    const response = await api.get<User>('/users/me');
+    return response.data;
+  },
+
+  getAll: async (skip = 0, limit = 100): Promise<UserListResponse> => {
+    const response = await api.get<UserListResponse>('/users', {
+      params: { skip, limit },
+    });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<User> => {
+    const response = await api.get<User>(`/users/${id}`);
+    return response.data;
+  },
+
+  create: async (user: UserCreate): Promise<User> => {
+    const response = await api.post<User>('/users', user);
+    return response.data;
+  },
+
+  update: async (id: number, user: UserUpdate): Promise<User> => {
+    const response = await api.patch<User>(`/users/${id}`, user);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/users/${id}`);
+  },
+};
+
+// API Keys API
+export const apiKeysAPI = {
+  getAll: async (): Promise<ApiKey[]> => {
+    const response = await api.get<ApiKey[]>('/api-keys');
+    return response.data;
+  },
+
+  create: async (apiKey: ApiKeyCreate): Promise<ApiKeyCreated> => {
+    const response = await api.post<ApiKeyCreated>('/api-keys', apiKey);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api-keys/${id}`);
   },
 };
 

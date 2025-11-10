@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,10 +17,10 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await login({ password });
+      await login({ email, password });
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid admin password');
+      setError(err.response?.data?.detail || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <h2 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">hyb8nate</h2>
-          <p className="mt-2 text-sm text-gray-600">Enter admin password to continue</p>
+          <p className="mt-2 text-sm text-gray-600">Sign in to your account</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -56,8 +57,26 @@ export const LoginPage: React.FC = () => {
           )}
 
           <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Enter your email"
+              disabled={loading}
+              autoFocus
+            />
+          </div>
+
+          <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Admin Password
+              Password
             </label>
             <input
               id="password"
@@ -67,9 +86,8 @@ export const LoginPage: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Enter admin password"
+              placeholder="Enter your password"
               disabled={loading}
-              autoFocus
             />
           </div>
 

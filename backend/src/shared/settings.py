@@ -3,24 +3,23 @@
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Labels(BaseModel):
+class Labels:
     """Labels Model."""
 
-    NAMESPACE_LABEL_KEY: str = "hyb8nate.xyz/enabled"
-    NAMESPACE_LABEL_VALUE: str = "true"
+    NAMESPACE_LABEL_KEY = "hyb8nate.xyz/enabled"
+    NAMESPACE_LABEL_VALUE = "true"
 
 
 class Environment(str, Enum):
     """ENUM Environments."""
 
     DEVELOPMENT = "development"
-    PRODUCTION = "production"
-    PREPRODUCTION = "preproduction"
     STAGING = "staging"
+    PRODUCTION = "production"
 
 
 class LogLevel(str, Enum):
@@ -33,7 +32,69 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class Settings(Labels, BaseSettings):
+class Auth(BaseSettings):
+    """Authentication settings."""
+
+    ADMIN_EMAIL: str = "admin@hyb8nate.local"
+    ADMIN_PASSWORD: str = "admin"
+    JWT_SECRET_KEY: str = str(uuid.uuid4())
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # Refresh tokens expire after 7 days
+
+
+class SnoozeOptions(BaseSettings):
+    """Snooze options settings."""
+
+    FLUXCD_OPTION: bool = False
+    ARGOCD_OPTION: bool = False
+
+
+class DatabaseType(str, Enum):
+    """ENUM Database Types."""
+
+    SQLITE = "sqlite"
+    POSTGRESQL = "postgresql"
+
+
+class Database(BaseSettings):
+    """Database settings."""
+
+    DB_TYPE: DatabaseType = DatabaseType.SQLITE  # Default to SQLite for easier setup
+    SQLITE_PATH: str = "./data/hyb8nate.db"  # Path for SQLite database file
+
+    # PostgreSQL settings (only needed if DB_TYPE=postgresql)
+    DB_HOST: str = "127.0.0.1"
+    DB_PORT: int = 5432
+    DB_USER: str = "hyb8nate"
+    DB_PASSWORD: str = "mysecretpassword"
+    DB_DB: str = "hyb8nate"
+
+    @property
+    def DB_URI(self) -> str:  # noqa: N802
+        """Construct the database URI based on DB_TYPE."""
+        if self.DB_TYPE == DatabaseType.SQLITE:
+            return f"sqlite+aiosqlite:///{self.SQLITE_PATH}"
+        else:
+            # PostgreSQL connection
+            return PostgresDsn.build(
+                scheme="postgresql+asyncpg",
+                username=self.DB_USER,
+                password=self.DB_PASSWORD,
+                host=self.DB_HOST,
+                port=int(self.DB_PORT),
+                path=self.DB_DB,
+            ).unicode_string()
+
+    @field_validator("DB_USER", "DB_PASSWORD", mode="before")
+    @classmethod
+    def check_if_at(cls, field_value) -> str:
+        if "@" in field_value:
+            raise ValueError("Character '@' is not allowed in database USER or PASSWORD fields.")
+        return field_value
+
+
+class Settings(Database, Auth, SnoozeOptions, BaseSettings):
     """API settings."""
 
     # ENV
@@ -42,15 +103,8 @@ class Settings(Labels, BaseSettings):
     LOG_LEVEL: LogLevel = LogLevel.INFO
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Paris"
-    DATA_DIR: str = "/data"
-    FLUXCD_OPTION: bool = False
-    ARGOCD_OPTION: bool = False
 
-    # AUTH
-    ADMIN_PASSWORD: str = "admin"  # Change via ADMIN_PASSWORD env var
-    JWT_SECRET_KEY: str = str(uuid.uuid4())
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    labels: Labels = Labels()
 
     model_config = SettingsConfigDict(
         # .env.prod takes priority over `.env`
