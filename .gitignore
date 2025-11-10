@@ -36,3 +36,5 @@ frontend/build/
 *.egg-info/
 
 backend/static/
+
+.DS_Store

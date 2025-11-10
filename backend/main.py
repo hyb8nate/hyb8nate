@@ -10,6 +10,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from src.router import router
 from src.schedules.services import get_scheduler
@@ -23,12 +26,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configure rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
     # Startup
-    logger.info("Starting hyb8nate (all-in-one mode)...")
     logger.info(f"Debug mode: {settings.DEBUG}")
 
     # Initialize database
@@ -58,6 +63,10 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
+
+# Configure rate limiter for the app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include API routes
 app.include_router(router, prefix="/api")

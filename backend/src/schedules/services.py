@@ -1,7 +1,7 @@
 """Scheduler services."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -14,6 +14,16 @@ from src.shared.database import AsyncSessionLocal, ScheduleDB
 from src.shared.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Get configured timezone
+tz = pytz.timezone(settings.TIMEZONE)
+
+
+def get_current_time() -> datetime:
+    """Get current time in configured timezone as naive datetime."""
+    utc_now = datetime.now(UTC)
+    local_time = utc_now.astimezone(tz)
+    return local_time.replace(tzinfo=None)
 
 
 class SchedulerService:
@@ -55,9 +65,7 @@ class SchedulerService:
                 # Get current time in configured timezone
                 tz = pytz.timezone(settings.TIMEZONE)
                 current_time = datetime.now(tz).strftime("%H:%M")
-                logger.debug(
-                    f"Current time ({settings.TIMEZONE}): {current_time}, Found {len(schedules)} enabled schedules"
-                )
+                logger.debug(f"Current time ({settings.TIMEZONE}): {current_time}, Found {len(schedules)} enabled schedules")
 
                 for schedule in schedules:
                     await self.process_schedule(db, schedule, current_time, k8s_client)
@@ -71,16 +79,15 @@ class SchedulerService:
     async def process_schedule(self, db: AsyncSession, schedule: ScheduleDB, current_time: str, k8s_client: K8sClient):
         """Process a single schedule"""
         try:
-            should_scale_down = self.should_scale_down(
+            # Check if we're in the hibernation period (between scale_down and scale_up times)
+            in_hibernation = self.is_in_hibernation_period(
                 schedule.scale_down_time,
-                current_time,
-            )
-            should_scale_up = self.should_scale_up(
                 schedule.scale_up_time,
                 current_time,
             )
 
-            if should_scale_down and not schedule.is_scaled_down:
+            # If we're in hibernation period and deployment is NOT scaled down → scale down
+            if in_hibernation and not schedule.is_scaled_down:
                 # Time to scale down
                 logger.debug(f"Scaling down {schedule.namespace}/{schedule.deployment_name}")
 
@@ -104,18 +111,13 @@ class SchedulerService:
 
                 # Update schedule state
                 schedule.is_scaled_down = True
-                schedule.last_scaled_at = datetime.now(
-                    tz=pytz.timezone(settings.TIMEZONE),
-                )
-                schedule.updated_at = datetime.now(
-                    tz=pytz.timezone(settings.TIMEZONE),
-                )
+                schedule.last_scaled_at = get_current_time()
+                schedule.updated_at = get_current_time()
 
-                logger.info(
-                    f"Scaled down {schedule.namespace}/{schedule.deployment_name} from {current_replicas} to 0 replicas"
-                )
+                logger.info(f"Scaled down {schedule.namespace}/{schedule.deployment_name} from {current_replicas} to 0 replicas")
 
-            elif should_scale_up and schedule.is_scaled_down:
+            # If we're NOT in hibernation period and deployment IS scaled down → scale up
+            elif not in_hibernation and schedule.is_scaled_down:
                 # Time to scale up
                 logger.debug(f"Scaling up {schedule.namespace}/{schedule.deployment_name}")
 
@@ -130,12 +132,10 @@ class SchedulerService:
 
                 # Update schedule state
                 schedule.is_scaled_down = False
-                schedule.last_scaled_at = datetime.utcnow()
-                schedule.updated_at = datetime.utcnow()
+                schedule.last_scaled_at = get_current_time()
+                schedule.updated_at = get_current_time()
 
-                logger.info(
-                    f"Scaled up {schedule.namespace}/{schedule.deployment_name} to {replicas_to_restore} replicas"
-                )
+                logger.info(f"Scaled up {schedule.namespace}/{schedule.deployment_name} to {replicas_to_restore} replicas")
 
         except Exception as e:
             logger.error(f"Error processing schedule for {schedule.namespace}/{schedule.deployment_name}: {e}")

@@ -26,13 +26,13 @@ class K8sClient:
         self.apps_v1 = client.AppsV1Api()
         self.core_v1 = client.CoreV1Api()
 
-    def list_namespaces(self) -> list[str]:
-        """List all namespaces"""
-        try:
-            namespaces = self.core_v1.list_namespace()
-            return [ns.metadata.name for ns in namespaces.items]
-        except ApiException as e:
-            raise Exception(f"Failed to list namespaces: {e}")
+    # def list_namespaces(self) -> list[str]:
+    #     """List all namespaces"""
+    #     try:
+    #         namespaces = self.core_v1.list_namespace()
+    #         return [ns.metadata.name for ns in namespaces.items]
+    #     except ApiException as e:
+    #         raise Exception(f"Failed to list namespaces: {e}")
 
     def list_allowed_namespaces(self, label_key: str, label_value: str) -> list[str]:
         """List only namespaces with specific label"""

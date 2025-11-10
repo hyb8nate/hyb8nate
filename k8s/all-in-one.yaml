@@ -53,40 +53,151 @@ subjects:
 
 ---
 apiVersion: v1
-kind: PersistentVolume
+kind: Secret
 metadata:
-  name: hyb8nate-pv
+  name: hyb8nate-secrets
+  namespace: hyb8nate
   labels:
     app: hyb8nate
+type: Opaque
+stringData:
+  # PostgreSQL credentials
+  POSTGRES_USER: hyb8nate
+  POSTGRES_PASSWORD: ChangeThisPassword123!
+  POSTGRES_DB: hyb8nate
+  # Application admin credentials
+  ADMIN_EMAIL: admin@example.com
+  ADMIN_PASSWORD: ChangeThisAdminPassword123!
+  # JWT Secret - IMPORTANT: Generate with: openssl rand -hex 32
+  JWT_SECRET_KEY: changethisjwtsecretkeyinproductionwith32hexchars
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  labels:
+    app: postgres
 spec:
   capacity:
-    storage: 100M
+    storage: 1Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   hostPath:
-    path: /mnt/data/hyb8nate
+    path: /mnt/data/postgres
     type: DirectoryOrCreate
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: hyb8nate-data
+  name: postgres-data
   namespace: hyb8nate
   labels:
-    app: hyb8nate
+    app: postgres
 spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: ""
   resources:
     requests:
-      storage: 100M
+      storage: 1Gi
   selector:
     matchLabels:
-      app: hyb8nate
+      app: postgres
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: hyb8nate
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              value: "hyb8nate"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "hyb8nate"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: hyb8nate
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  type: ClusterIP
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5432
+      targetPort: postgres
 
 ---
 apiVersion: apps/v1
@@ -99,7 +210,10 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: hyb8nate
@@ -109,6 +223,24 @@ spec:
         app: hyb8nate
     spec:
       serviceAccountName: hyb8nate-service-account
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready -h postgres -U $POSTGRES_USER; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: POSTGRES_USER
       containers:
         - name: hyb8nate
           image: hyb8nate/hyb8nate:latest
@@ -118,17 +250,59 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
-            - name: HOME
-              value: /data
-            - name: UV_NO_CACHE
-              value: "1"
-            - name: DATA_DIR
-              value: /data
+            # Application settings
+            - name: ENVIRONMENT
+              value: "production"
+            - name: DEBUG
+              value: "false"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: TIMEZONE
+              value: "Europe/Paris"
+            # Authentication
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: ADMIN_EMAIL
             - name: ADMIN_PASSWORD
-              value: admin
-          volumeMounts:
-            - name: data
-              mountPath: /data
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: ADMIN_PASSWORD
+            # Security
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: JWT_SECRET_KEY
+            - name: ACCESS_TOKEN_EXPIRE_MINUTES
+              value: "30"
+            # PostgreSQL connection
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: POSTGRES_PASSWORD
+            - name: DB_DB
+              valueFrom:
+                secretKeyRef:
+                  name: hyb8nate-secrets
+                  key: POSTGRES_DB
+            # Snooze options
+            - name: FLUXCD_OPTION
+              value: "false"
+            - name: ARGOCD_OPTION
+              value: "false"
           livenessProbe:
             httpGet:
               path: /api/health
@@ -152,11 +326,6 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: hyb8nate-data
-
 ---
 apiVersion: v1
 kind: Service
@@ -167,7 +336,7 @@ metadata:
     app: hyb8nate
 spec:
   selector:
-      app: hyb8nate
+    app: hyb8nate
   type: ClusterIP
   ports:
     - name: http
