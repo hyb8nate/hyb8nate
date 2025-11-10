@@ -1,4 +1,4 @@
-name: Build and Push Docker Images for dev-* branches
+name: Dev  branches image publisher (dev-*)
 
 on:
   push:
